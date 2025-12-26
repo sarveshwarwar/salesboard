@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 # ---------------- PAGE CONFIG ----------------
@@ -64,33 +63,21 @@ monthly_sales = (
     .reset_index()
 )
 
-fig1, ax1 = plt.subplots()
-ax1.plot(monthly_sales.index, monthly_sales["Sales"])
-ax1.set_title("📅 Monthly Sales Trend")
-ax1.set_xlabel("Month Index")
-ax1.set_ylabel("Sales")
-st.pyplot(fig1)
+st.subheader("📅 Monthly Sales Trend")
+st.line_chart(monthly_sales["Sales"])
 
 # ---------------- SALES BY REGION ----------------
+st.subheader("🌍 Sales by Region")
 region_sales = filtered_df.groupby("Region")["Sales"].sum()
-
-fig2, ax2 = plt.subplots()
-region_sales.plot(kind="bar", ax=ax2)
-ax2.set_title("🌍 Sales by Region")
-ax2.set_xlabel("Region")
-ax2.set_ylabel("Sales")
-st.pyplot(fig2)
+st.bar_chart(region_sales)
 
 # ---------------- PROFIT BY CATEGORY ----------------
+st.subheader("🧩 Profit by Category")
 category_profit = filtered_df.groupby("Category")["Profit"].sum()
-
-fig3, ax3 = plt.subplots()
-category_profit.plot(kind="pie", autopct="%1.1f%%", ax=ax3)
-ax3.set_ylabel("")
-ax3.set_title("🧩 Profit by Category")
-st.pyplot(fig3)
+st.bar_chart(category_profit)
 
 # ---------------- TOP PRODUCTS ----------------
+st.subheader("🏆 Top 10 Products by Sales")
 top_products = (
     filtered_df
     .groupby("Product")["Sales"]
@@ -98,12 +85,7 @@ top_products = (
     .sort_values(ascending=False)
     .head(10)
 )
-
-fig4, ax4 = plt.subplots()
-top_products.plot(kind="barh", ax=ax4)
-ax4.set_title("🏆 Top 10 Products by Sales")
-ax4.set_xlabel("Sales")
-st.pyplot(fig4)
+st.bar_chart(top_products)
 
 st.divider()
 
@@ -131,12 +113,11 @@ last_index = forecast_df["TimeIndex"].max()
 future_index = np.arange(last_index + 1, last_index + future_steps + 1)
 future_sales = model.predict(future_index.reshape(-1, 1))
 
-fig5, ax5 = plt.subplots()
-ax5.plot(forecast_df["TimeIndex"], forecast_df["Sales"], label="Actual")
-ax5.plot(future_index, future_sales, label="Forecast")
-ax5.set_title("📈 Sales Forecast")
-ax5.legend()
-st.pyplot(fig5)
+forecast_result = pd.DataFrame({
+    "Sales": future_sales
+})
+
+st.line_chart(pd.concat([forecast_df["Sales"], forecast_result], ignore_index=True))
 
 # ---------------- DATA PREVIEW ----------------
 st.subheader("📄 Data Preview")
@@ -145,10 +126,10 @@ st.dataframe(filtered_df.head(50))
 # ---------------- INSIGHTS ----------------
 st.subheader("📌 Business Insights")
 st.write("""
-✔ Sales show seasonal trends  
-✔ Few products contribute most revenue  
-✔ Certain regions outperform consistently  
-✔ Forecast helps business planning
+✔ Sales show seasonal patterns  
+✔ Few products contribute majority of revenue  
+✔ Regional performance varies significantly  
+✔ Forecasting helps business planning
 """)
 
 st.success("✅ Dashboard loaded successfully!")
