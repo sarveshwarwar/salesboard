@@ -1,59 +1,38 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import numpy as np
-from sklearn.linear_model import LinearRegression
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(
-    page_title="Sales Analysis Dashboard",
-    layout="wide"
-)
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
 
-# ---------------- TITLE ----------------
 st.title("📊 Sales Analysis Dashboard")
-st.markdown("End-to-end sales performance analysis using Python & Streamlit")
+st.markdown("End-to-end sales analysis using Python & Streamlit")
 
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
     df = pd.read_csv("sales_data.csv")
-    df['Order Date'] = pd.to_datetime(df['Order Date'])
-    df['Month'] = df['Order Date'].dt.month
-    df['Year'] = df['Order Date'].dt.year
+    df["Order Date"] = pd.to_datetime(df["Order Date"])
+    df["Year"] = df["Order Date"].dt.year
+    df["Month"] = df["Order Date"].dt.month
     return df
 
 df = load_data()
 
 # ---------------- SIDEBAR FILTERS ----------------
 st.sidebar.header("🔍 Filters")
+region_filter = st.sidebar.multiselect("Select Region", df["Region"].unique(), default=df["Region"].unique())
+category_filter = st.sidebar.multiselect("Select Category", df["Category"].unique(), default=df["Category"].unique())
 
-region_filter = st.sidebar.multiselect(
-    "Select Region",
-    df['Region'].unique(),
-    default=df['Region'].unique()
-)
+filtered_df = df[(df["Region"].isin(region_filter)) & (df["Category"].isin(category_filter))]
 
-category_filter = st.sidebar.multiselect(
-    "Select Category",
-    df['Category'].unique(),
-    default=df['Category'].unique()
-)
-
-filtered_df = df[
-    (df['Region'].isin(region_filter)) &
-    (df['Category'].isin(category_filter))
-]
-
-# ---------------- KPI CALCULATIONS ----------------
-total_sales = filtered_df['Sales'].sum()
-total_profit = filtered_df['Profit'].sum()
+# ---------------- KPIs ----------------
+total_sales = filtered_df["Sales"].sum()
+total_profit = filtered_df["Profit"].sum()
 total_orders = len(filtered_df)
-profit_margin = (total_profit / total_sales) * 100 if total_sales > 0 else 0
+profit_margin = (total_profit / total_sales * 100) if total_sales > 0 else 0
 
-# ---------------- KPI DISPLAY ----------------
 c1, c2, c3, c4 = st.columns(4)
-
 c1.metric("💰 Total Sales", f"₹{total_sales:,.0f}")
 c2.metric("📈 Total Profit", f"₹{total_profit:,.0f}")
 c3.metric("🧾 Orders", total_orders)
@@ -62,121 +41,46 @@ c4.metric("📊 Profit Margin", f"{profit_margin:.2f}%")
 st.divider()
 
 # ---------------- MONTHLY SALES TREND ----------------
-monthly_sales = (
-    filtered_df
-    .groupby(['Year', 'Month'])['Sales']
-    .sum()
-    .reset_index()
-)
-
-monthly_sales['Period'] = monthly_sales['Year'].astype(str) + "-" + monthly_sales['Month'].astype(str)
-
-fig1 = px.line(
-    monthly_sales,
-    x="Period",
-    y="Sales",
-    markers=True,
-    title="📅 Monthly Sales Trend"
-)
-
-st.plotly_chart(fig1, use_container_width=True)
+monthly_sales = filtered_df.groupby(["Year","Month"])["Sales"].sum().reset_index()
+st.subheader("📅 Monthly Sales Trend")
+st.line_chart(monthly_sales["Sales"])
 
 # ---------------- SALES BY REGION ----------------
-region_sales = filtered_df.groupby("Region")['Sales'].sum().reset_index()
-
-fig2 = px.bar(
-    region_sales,
-    x="Region",
-    y="Sales",
-    title="🌍 Sales by Region"
-)
-
-st.plotly_chart(fig2, use_container_width=True)
+st.subheader("🌍 Sales by Region")
+region_sales = filtered_df.groupby("Region")["Sales"].sum()
+st.bar_chart(region_sales)
 
 # ---------------- PROFIT BY CATEGORY ----------------
-category_profit = filtered_df.groupby("Category")['Profit'].sum().reset_index()
-
-fig3 = px.pie(
-    category_profit,
-    names="Category",
-    values="Profit",
-    title="🧩 Profit by Category"
-)
-
-st.plotly_chart(fig3, use_container_width=True)
+st.subheader("🧩 Profit by Category")
+category_profit = filtered_df.groupby("Category")["Profit"].sum()
+st.bar_chart(category_profit)
 
 # ---------------- TOP PRODUCTS ----------------
-top_products = (
-    filtered_df
-    .groupby("Product")['Sales']
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-    .reset_index()
-)
-
-fig4 = px.bar(
-    top_products,
-    x="Sales",
-    y="Product",
-    orientation="h",
-    title="🏆 Top 10 Products by Sales"
-)
-
-st.plotly_chart(fig4, use_container_width=True)
+st.subheader("🏆 Top 10 Products by Sales")
+top_products = filtered_df.groupby("Product")["Sales"].sum().sort_values(ascending=False).head(10)
+st.bar_chart(top_products)
 
 st.divider()
 
-# ---------------- SALES FORECASTING ----------------
+# ---------------- SIMPLE SALES FORECAST ----------------
 st.subheader("🔮 Sales Forecast (Next 6 Months)")
 
-forecast_df = (
-    filtered_df
-    .groupby(['Year', 'Month'])['Sales']
-    .sum()
-    .reset_index()
-)
+# Using manual linear regression with NumPy
+sales_series = monthly_sales["Sales"].values
+n = len(sales_series)
+x = np.arange(n)
+y = sales_series
 
-forecast_df['TimeIndex'] = np.arange(len(forecast_df))
+# Linear regression formula: y = mx + b
+m = (n*np.sum(x*y) - np.sum(x)*np.sum(y)) / (n*np.sum(x**2) - (np.sum(x)**2))
+b = (np.sum(y) - m*np.sum(x)) / n
 
-X = forecast_df[['TimeIndex']]
-y = forecast_df['Sales']
+future_steps = 6
+future_x = np.arange(n, n+future_steps)
+future_y = m*future_x + b
 
-model = LinearRegression()
-model.fit(X, y)
-
-future_months = 6
-last_index = forecast_df['TimeIndex'].max()
-
-future_index = np.arange(
-    last_index + 1,
-    last_index + future_months + 1
-)
-
-future_sales = model.predict(future_index.reshape(-1, 1))
-
-forecast_result = pd.DataFrame({
-    "TimeIndex": future_index,
-    "Forecasted Sales": future_sales
-})
-
-fig_forecast = px.line(title="📈 Sales Forecast")
-
-fig_forecast.add_scatter(
-    x=forecast_df['TimeIndex'],
-    y=forecast_df['Sales'],
-    mode='lines+markers',
-    name='Historical Sales'
-)
-
-fig_forecast.add_scatter(
-    x=forecast_result['TimeIndex'],
-    y=forecast_result['Forecasted Sales'],
-    mode='lines+markers',
-    name='Forecasted Sales'
-)
-
-st.plotly_chart(fig_forecast, use_container_width=True)
+forecast_series = np.concatenate([y, future_y])
+st.line_chart(forecast_series)
 
 # ---------------- DATA PREVIEW ----------------
 st.subheader("📄 Data Preview")
@@ -184,12 +88,11 @@ st.dataframe(filtered_df.head(50))
 
 # ---------------- INSIGHTS ----------------
 st.subheader("📌 Business Insights")
-
 st.write("""
-✔ Sales show clear seasonal trends  
-✔ A few products contribute major revenue  
-✔ Certain regions consistently outperform others  
-✔ Forecast helps in inventory and revenue planning
+✔ Sales show seasonal patterns  
+✔ Few products contribute majority of revenue  
+✔ Certain regions outperform consistently  
+✔ Forecasting helps business planning
 """)
 
 st.success("✅ Dashboard loaded successfully!")
