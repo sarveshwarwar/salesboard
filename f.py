@@ -1,12 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Sales Analysis Dashboard", layout="wide")
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
 
-# ---------------- TITLE ----------------
 st.title("📊 Sales Analysis Dashboard")
 st.markdown("End-to-end sales analysis using Python & Streamlit")
 
@@ -23,23 +21,10 @@ df = load_data()
 
 # ---------------- SIDEBAR FILTERS ----------------
 st.sidebar.header("🔍 Filters")
+region_filter = st.sidebar.multiselect("Select Region", df["Region"].unique(), default=df["Region"].unique())
+category_filter = st.sidebar.multiselect("Select Category", df["Category"].unique(), default=df["Category"].unique())
 
-region_filter = st.sidebar.multiselect(
-    "Select Region",
-    df["Region"].unique(),
-    default=df["Region"].unique()
-)
-
-category_filter = st.sidebar.multiselect(
-    "Select Category",
-    df["Category"].unique(),
-    default=df["Category"].unique()
-)
-
-filtered_df = df[
-    (df["Region"].isin(region_filter)) &
-    (df["Category"].isin(category_filter))
-]
+filtered_df = df[(df["Region"].isin(region_filter)) & (df["Category"].isin(category_filter))]
 
 # ---------------- KPIs ----------------
 total_sales = filtered_df["Sales"].sum()
@@ -56,13 +41,7 @@ c4.metric("📊 Profit Margin", f"{profit_margin:.2f}%")
 st.divider()
 
 # ---------------- MONTHLY SALES TREND ----------------
-monthly_sales = (
-    filtered_df
-    .groupby(["Year", "Month"])["Sales"]
-    .sum()
-    .reset_index()
-)
-
+monthly_sales = filtered_df.groupby(["Year","Month"])["Sales"].sum().reset_index()
 st.subheader("📅 Monthly Sales Trend")
 st.line_chart(monthly_sales["Sales"])
 
@@ -78,46 +57,30 @@ st.bar_chart(category_profit)
 
 # ---------------- TOP PRODUCTS ----------------
 st.subheader("🏆 Top 10 Products by Sales")
-top_products = (
-    filtered_df
-    .groupby("Product")["Sales"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-)
+top_products = filtered_df.groupby("Product")["Sales"].sum().sort_values(ascending=False).head(10)
 st.bar_chart(top_products)
 
 st.divider()
 
-# ---------------- SALES FORECASTING ----------------
+# ---------------- SIMPLE SALES FORECAST ----------------
 st.subheader("🔮 Sales Forecast (Next 6 Months)")
 
-forecast_df = (
-    filtered_df
-    .groupby(["Year", "Month"])["Sales"]
-    .sum()
-    .reset_index()
-)
+# Using manual linear regression with NumPy
+sales_series = monthly_sales["Sales"].values
+n = len(sales_series)
+x = np.arange(n)
+y = sales_series
 
-forecast_df["TimeIndex"] = np.arange(len(forecast_df))
-
-X = forecast_df[["TimeIndex"]]
-y = forecast_df["Sales"]
-
-model = LinearRegression()
-model.fit(X, y)
+# Linear regression formula: y = mx + b
+m = (n*np.sum(x*y) - np.sum(x)*np.sum(y)) / (n*np.sum(x**2) - (np.sum(x)**2))
+b = (np.sum(y) - m*np.sum(x)) / n
 
 future_steps = 6
-last_index = forecast_df["TimeIndex"].max()
+future_x = np.arange(n, n+future_steps)
+future_y = m*future_x + b
 
-future_index = np.arange(last_index + 1, last_index + future_steps + 1)
-future_sales = model.predict(future_index.reshape(-1, 1))
-
-forecast_result = pd.DataFrame({
-    "Sales": future_sales
-})
-
-st.line_chart(pd.concat([forecast_df["Sales"], forecast_result], ignore_index=True))
+forecast_series = np.concatenate([y, future_y])
+st.line_chart(forecast_series)
 
 # ---------------- DATA PREVIEW ----------------
 st.subheader("📄 Data Preview")
@@ -128,7 +91,7 @@ st.subheader("📌 Business Insights")
 st.write("""
 ✔ Sales show seasonal patterns  
 ✔ Few products contribute majority of revenue  
-✔ Regional performance varies significantly  
+✔ Certain regions outperform consistently  
 ✔ Forecasting helps business planning
 """)
 
