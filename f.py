@@ -2,25 +2,24 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
-
 st.title("📊 Sales Analysis Dashboard")
 st.markdown("End-to-end sales analysis using Python & Streamlit")
 
-# ---------------- LOAD DATA ----------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("sales_data.csv")
+# ---------------- FILE UPLOADER ----------------
+st.sidebar.header("https://www.kaggle.com/datasets/kyanyoga/sample-sales-data")
+uploaded_file = st.sidebar.file_uploader("Upload sales_data.csv", type=["csv"])
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
     df["Order Date"] = pd.to_datetime(df["Order Date"])
     df["Year"] = df["Order Date"].dt.year
     df["Month"] = df["Order Date"].dt.month
-    return df
-
-df = load_data()
+else:
+    st.warning("Please upload sales_data.csv to continue.")
+    st.stop()
 
 # ---------------- SIDEBAR FILTERS ----------------
-st.sidebar.header("🔍 Filters")
 region_filter = st.sidebar.multiselect("Select Region", df["Region"].unique(), default=df["Region"].unique())
 category_filter = st.sidebar.multiselect("Select Category", df["Category"].unique(), default=df["Category"].unique())
 
@@ -41,7 +40,7 @@ c4.metric("📊 Profit Margin", f"{profit_margin:.2f}%")
 st.divider()
 
 # ---------------- MONTHLY SALES TREND ----------------
-monthly_sales = filtered_df.groupby(["Year","Month"])["Sales"].sum().reset_index()
+monthly_sales = filtered_df.groupby(["Year", "Month"])["Sales"].sum().reset_index()
 st.subheader("📅 Monthly Sales Trend")
 st.line_chart(monthly_sales["Sales"])
 
@@ -62,23 +61,17 @@ st.bar_chart(top_products)
 
 st.divider()
 
-# ---------------- SIMPLE SALES FORECAST ----------------
+# ---------------- SIMPLE FORECAST ----------------
 st.subheader("🔮 Sales Forecast (Next 6 Months)")
-
-# Using manual linear regression with NumPy
 sales_series = monthly_sales["Sales"].values
 n = len(sales_series)
 x = np.arange(n)
 y = sales_series
-
-# Linear regression formula: y = mx + b
 m = (n*np.sum(x*y) - np.sum(x)*np.sum(y)) / (n*np.sum(x**2) - (np.sum(x)**2))
 b = (np.sum(y) - m*np.sum(x)) / n
-
 future_steps = 6
 future_x = np.arange(n, n+future_steps)
 future_y = m*future_x + b
-
 forecast_series = np.concatenate([y, future_y])
 st.line_chart(forecast_series)
 
